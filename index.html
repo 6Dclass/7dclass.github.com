@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Домашнее Задание Нашего Класса</title>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 650px; margin: 0 auto; }
+        header { text-align: center; margin-bottom: 25px; }
+        header h1 { cursor: pointer; user-select: none; color: #1877f2; margin-bottom: 5px; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        h2 { color: #333; margin-top: 0; border-bottom: 2px solid #f0f2f5; padding-bottom: 10px; }
+        .homework-list { list-style: none; padding: 0; margin: 0; }
+        .homework-list li { padding: 10px 0; border-bottom: 1px dashed #e4e6eb; font-size: 16px; display: flex; justify-content: space-between; align-items: center; }
+        .homework-list li:last-child { border-bottom: none; }
+        strong { color: #4b4f56; display: inline-block; width: 120px; }
+        .status-msg { text-align: center; color: #666; font-size: 13px; margin-bottom: 15px; font-weight: 500; }
+        
+        /* Кнопка удаления */
+        .delete-btn { background: #ffebe9; color: #ff3b30; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 13px; display: none; }
+        .delete-btn:hover { background: #ffd1cf; }
+        
+        /* Админ-панель */
+        .admin-panel { background: #e7f3ff; border: 1px solid #1877f2; display: none; }
+        .form-group { margin-bottom: 12px; display: flex; gap: 10px; }
+        select, input[type="text"], input[type="password"] { padding: 10px; border: 1px solid #ccd0d5; border-radius: 6px; font-size: 14px; flex: 1; box-sizing: border-box; }
+        select { flex: 0 0 130px; }
+        button.main-btn { background-color: #1877f2; color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; font-size: 15px; }
+        button.main-btn:hover { background-color: #166fe5; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <!-- Нажми сюда 5 раз подряд, чтобы открыть ввод ДЗ для класса -->
+        <h1 id="secret-title">📚 ДЗ Онлайн</h1>
+        <p>Актуальное домашнее задание для нашего класса</p>
+        <div class="status-msg" id="sync-status">Загрузка общей базы класса...</div>
+    </header>
+
+    <!-- ДНИ НЕДЕЛИ -->
+    <div class="card"><h2>Понедельник</h2><ul class="homework-list" id="monday-list"></ul></div>
+    <div class="card"><h2>Вторник</h2><ul class="homework-list" id="tuesday-list"></ul></div>
+    <div class="card"><h2>Среда</h2><ul class="homework-list" id="wednesday-list"></ul></div>
+    <div class="card"><h2>Четверг</h2><ul class="homework-list" id="thursday-list"></ul></div>
+    <div class="card"><h2>Пятница</h2><ul class="homework-list" id="friday-list"></ul></div>
+    <div class="card"><h2>Суббота</h2><ul class="homework-list" id="saturday-list"></ul></div>
+
+    <!-- СКРЫТАЯ АДМИНКА -->
+    <div class="card admin-panel" id="admin-block">
+        <h3>🔧 Панель управления ДЗ класса</h3>
+        <div class="form-group">
+            <select id="day-select">
+                <option value="monday">Понедельник</option>
+                <option value="tuesday">Вторник</option>
+                <option value="wednesday">Среда</option>
+                <option value="thursday">Четверг</option>
+                <option value="friday">Пятница</option>
+                <option value="saturday">Суббота</option>
+            </select>
+            <input type="text" id="subject-input" placeholder="Предмет (например, Литература)">
+        </div>
+        <div class="form-group">
+            <input type="text" id="task-input" placeholder="Что задали?">
+        </div>
+        <div class="form-group">
+            <input type="password" id="admin-password" placeholder="Введи секретный пароль еще раз для подтверждения (1234)">
+        </div>
+        <button type="button" class="main-btn" onclick="saveHomework()">Сохранить для всего класса</button>
+    </div>
+</div>
+
+<script>
+    // Секретный пароль администратора (можешь поменять на свой)
+    var MY_SECRET_PASSWORD = "1234"; 
+    var isAdminActive = false;
+    
+    // Подключение к выделенному интернет-серверу обмена данными
+    var SERVER_URL = "https://jsonbin.io";
+    var ACCESS_KEY = "$2a$10$R9hZqRiwGvXvR7.M37CkeO5SgNms7B1l5v68aUfU.L90kQ13bYEqe"; 
+
+    var homeworkData = { monday: {}, tuesday: {}, wednesday: {}, thursday: {}, friday: {}, saturday: {} };
+
+    // При открытии сайта автоматически скачиваем актуальное ДЗ из интернета
+    loadFromServer();
+
+    // СЕКРЕТНЫЙ ВХОД ДЛЯ ТЕБЯ: 5 быстрых кликов по названию сайта «📚 ДЗ Онлайн»
+    var clickCount = 0;
+    document.getElementById('secret-title').addEventListener('click', function() {
+        clickCount++;
+        if (clickCount === 5) {
+            clickCount = 0;
+            var passCheck = prompt("Введите пароль администратора (по умолчанию 1234):");
+            if (passCheck === MY_SECRET_PASSWORD) {
+                isAdminActive = true;
+                document.getElementById('admin-block').style.display = 'block';
+                showDeleteButtons();
+                alert("🔒 Режим редактирования включен! Панель управления открылась в самом низу страницы.");
+                document.getElementById('admin-block').scrollIntoView({ behavior: 'smooth' });
+            } else { alert("❌ Неверный пароль доступа!"); }
+        }
+        setTimeout(function() { clickCount = 0; }, 2000);
+    });
+
+    function loadFromServer() {
+        document.getElementById('sync-status').innerText = "🔄 Обновление данных из интернета...";
+        fetch(SERVER_URL + "/latest", { headers: { "X-Master-Key": ACCESS_KEY } })
+        .then(res => {
+            if (!res.ok) throw new Error();
+            return res.json();
+        })
+        .then(resData => {
+            homeworkData = resData.record;
+            renderAllDays();
+            if(isAdminActive) showDeleteButtons();
+            document.getElementById('sync-status').innerText = "🟢 Данные класса синхронизированы";
+        })
+        .catch(err => {
+            // Если запуск локальный, браузер покажет ошибку CORS, но на хостинге всё будет отлично!
+            document.getElementById('sync-status').innerText = "🟡 Локальный режим (выложите на хостинг для синхронизации)";
+            console.log("Для работы интернет-базы сайт должен быть запущен по ссылке из GitHub Pages.");
+        });
+    }
+
+    function saveToServer() {
+        document.getElementById('sync-status').innerText = "💾 Публикация изменений на сервер класса...";
+        fetch(SERVER_URL, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json", "X-Master-Key": ACCESS_KEY },
+            body: JSON.stringify(homeworkData)
+        })
+        .then(res => {
+            if (!res.ok) throw new Error();
+            return res.json();
+        })
+        .then(() => {
+            loadFromServer();
+            alert('✅ ДЗ успешно сохранено на сервере! Теперь его видят все твои одноклассники.');
+        })
+        .catch(err => {
+            alert('❌ Ошибка сети! Убедись, что сайт загружен на хостинг GitHub Pages, иначе браузер блокирует интернет-запросы.');
+        });
+    }
+
+    function renderAllDays() {
+        updateDayDisplay('monday', homeworkData.monday, 'monday-list');
+        updateDayDisplay('tuesday', homeworkData.tuesday, 'tuesday-list');
+        updateDayDisplay('wednesday', homeworkData.wednesday, 'wednesday-list');
+        updateDayDisplay('thursday', homeworkData.thursday, 'thursday-list');
+        updateDayDisplay('friday', homeworkData.friday, 'friday-list');
+        updateDayDisplay('saturday', homeworkData.saturday, 'saturday-list');
+    }
+
+    function updateDayDisplay(dayName, dayData, elementId) {
+        var listElement = document.getElementById(elementId);
+        if (!listElement) return;
+        listElement.innerHTML = '';
+        if (!dayData || Object.keys(dayData).length === 0) {
+            listElement.innerHTML = '<li>Ничего не задано 🎉</li>';
+            return;
+        }
+        for (var subject in dayData) {
+            var li = document.createElement('li');
+            var btnStyle = isAdminActive ? 'block' : 'none';
+            li.innerHTML = '<span><strong>' + subject + ':</strong> ' + dayData[subject] + '</span>' +
+                           '<button class="delete-btn" style="display:' + btnStyle + '" onclick="deleteSubject(\'' + dayName + '\', \'' + subject + '\')">Удалить</button>';
+            listElement.appendChild(li);
+        }
+    }
+
+    function showDeleteButtons() {
+        var delButtons = document.querySelectorAll('.delete-btn');
+        delButtons.forEach(function(btn) { btn.style.display = 'block'; });
+    }
+
+    function saveHomework() {
+        var day = document.getElementById('day-select').value;
+        var subject = document.getElementById('subject-input').value.trim();
+        var task = document.getElementById('task-input').value.trim();
+        var passInput = document.getElementById('admin-password').value;
+
+        if (passInput !== MY_SECRET_PASSWORD) { return alert('❌ Неверный защитный пароль в поле ввода!'); }
+        if (subject === '' || task === '') { return alert('⚠️ Заполни все поля формы!'); }
+
+        homeworkData[day][subject] = task;
+        
+        document.getElementById('subject-input').value = '';
+        document.getElementById('task-input').value = '';
+        document.getElementById('admin-password').value = '';
+        
+        saveToServer();
+    }
+
+    window.deleteSubject = function(day, subject) {
+        var confirmPass = prompt("Для удаления предмета \"" + subject + "\" введите пароль:");
+        if (confirmPass !== MY_SECRET_PASSWORD) { return alert('❌ Неверный пароль!'); }var
